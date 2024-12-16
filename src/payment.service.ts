@@ -208,13 +208,15 @@ export class PaymentService {
   ) {
     const ALLOWED_LATENCY = 250; // ~ ms
     const n = wrapperPayments.length;
-    const afterDot10 = Big(10).pow(currencyPrecision);
-    const W = afterDot10.times(maxToPayOutAmount).round(0).toNumber() | 0;
+    const centsInCurrency = Big(10).pow(currencyPrecision);
+    const W = centsInCurrency.times(maxToPayOutAmount).round(0).toNumber();
 
     const factor = (100 * ALLOWED_LATENCY * 100 * 50) / n / W / 250;
-    const capacity =
-      afterDot10.times(sumToPayOutAmount).round(0).toNumber() | 0;
-    const scaledCapacity = factor < 1 ? capacity * factor : capacity;
+    const capacity = centsInCurrency
+      .times(sumToPayOutAmount)
+      .round(0)
+      .toNumber();
+    const scaledCapacity = (factor < 1 ? capacity * factor : capacity) | 0;
     if (scaledCapacity < 3) {
       // very bad heuristic. just use simple method
       return this.maximizePayoutService.maximizePayout(
@@ -230,12 +232,17 @@ export class PaymentService {
     return this.maximizePayoutService.maximizePayoutDP(
       scaledCapacity,
       wrapperPayments.map((wp) => {
-        const availablePayOutAmount =
-          afterDot10.times(wp.toPayOutAmount).round(0).toNumber() | 0;
+        const availablePayOutAmount = centsInCurrency
+          .times(wp.toPayOutAmount)
+          .round(0)
+          .toNumber();
+        const scaledAmount =
+          (factor < 1
+            ? availablePayOutAmount * factor
+            : availablePayOutAmount) | 0;
         return {
           id: wp.id,
-          availablePayOutAmount:
-            factor < 1 ? availablePayOutAmount * factor : availablePayOutAmount,
+          availablePayOutAmount: scaledAmount,
         };
       }),
     );
