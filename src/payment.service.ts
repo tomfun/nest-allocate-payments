@@ -98,7 +98,7 @@ export class PaymentService {
     });
   }
 
-  payoutPayments(shopId: string): Payment[] {
+  payoutPayments(shopId: string): { totalPayout: string; payments: Payment[] } {
     const shopPayments = this.getPayments(shopId).filter(
       (p) =>
         p.status !== PaymentStatus.new && p.status !== PaymentStatus.paidOut,
@@ -121,24 +121,39 @@ export class PaymentService {
       }
       wrapperPayments.push(wrapped);
     });
-    const subset = this.maximizePayoutService.maximizePayout(
-      sumToPayOutAmount.round(currencyPrecision).toNumber(),
-      wrapperPayments.map((wp) => ({
-        id: wp.id,
-        availablePayOutAmount: wp.toPayOutAmount // allow pay out locked (processed) payments
-          .round(currencyPrecision)
-          .toNumber(),
-      })),
+    const subset = this.payoutSubOptimal(
+      sumToPayOutAmount,
+      maxToPayOutAmount,
+      wrapperPayments,
     );
-    // todo: make precision safe sum
-    return subset.selectedPayments.map((sp) => {
+    const payments = [] as Payment[];
+    let actualPayOutAmount = Big(0);
+    // high precision sum checking
+    for (const sp of subset.selectedPayments) {
       const payment = this.payments.find((p) => p.id === sp.id);
-      payment.amountPaidOut = sp.availablePayOutAmount.toString();
+      const wrapperPayment = wrapperPayments.find((p) => p.id === sp.id);
+      if (
+        actualPayOutAmount
+          .add(wrapperPayment.toPayOutAmount)
+          .gt(sumToPayOutAmount)
+      ) {
+        break;
+      }
+      actualPayOutAmount = actualPayOutAmount.add(
+        wrapperPayment.toPayOutAmount,
+      );
+      payment.amountPaidOut = wrapperPayment.toPayOutAmount
+        .add(payment.amountPaidOut)
+        .toString();
       if (payment.status === PaymentStatus.unlocked) {
         payment.status = PaymentStatus.paidOut;
       }
-      return payment;
-    });
+      payments.push(payment);
+    }
+    return {
+      totalPayout: actualPayOutAmount.toString(),
+      payments,
+    };
   }
 
   getPayments(shopId: string): Payment[] {
@@ -180,5 +195,49 @@ export class PaymentService {
       toPayOutAmount,
       availablePayOutAmount,
     };
+  }
+
+  private payoutSubOptimal(
+    sumToPayOutAmount: Big,
+    maxToPayOutAmount: Big,
+    wrapperPayments: {
+      id: string;
+      toPayOutAmount: Big;
+      availablePayOutAmount: Big;
+    }[],
+  ) {
+    const ALLOWED_LATENCY = 250; // ~ ms
+    const n = wrapperPayments.length;
+    const afterDot10 = Big(10).pow(currencyPrecision);
+    const W = afterDot10.times(maxToPayOutAmount).round(0).toNumber() | 0;
+
+    const factor = (100 * ALLOWED_LATENCY * 100 * 50) / n / W / 250;
+    const capacity =
+      afterDot10.times(sumToPayOutAmount).round(0).toNumber() | 0;
+    const scaledCapacity = factor < 1 ? capacity * factor : capacity;
+    if (scaledCapacity < 3) {
+      // very bad heuristic. just use simple method
+      return this.maximizePayoutService.maximizePayout(
+        sumToPayOutAmount.round(currencyPrecision).toNumber(),
+        wrapperPayments.map((wp) => ({
+          id: wp.id,
+          availablePayOutAmount: wp.toPayOutAmount // allow pay out locked (processed) payments
+            .round(currencyPrecision)
+            .toNumber(),
+        })),
+      );
+    }
+    return this.maximizePayoutService.maximizePayoutDP(
+      scaledCapacity,
+      wrapperPayments.map((wp) => {
+        const availablePayOutAmount =
+          afterDot10.times(wp.toPayOutAmount).round(0).toNumber() | 0;
+        return {
+          id: wp.id,
+          availablePayOutAmount:
+            factor < 1 ? availablePayOutAmount * factor : availablePayOutAmount,
+        };
+      }),
+    );
   }
 }

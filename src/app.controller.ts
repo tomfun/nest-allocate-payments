@@ -66,12 +66,6 @@ export class AppController {
     if (!shop) {
       throw new NotFoundException();
     }
-    const payments = this.paymentService.payoutPayments(shopId);
-    return {
-      totalPayout: payments
-        .reduce((sum, payment) => sum.add(payment.amountPaidOut), Big(0))
-        .toString(),
-      payments,
-    };
+    return this.paymentService.payoutPayments(shopId);
   }
 }
