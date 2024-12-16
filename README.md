@@ -1,6 +1,5 @@
-## Test app - calculate math in parallel
+## Test app - allocate payments
 
-Use new node with workers!
 You can see how to call the API - [http-requests.http](./http-requests.http)
 
 Build on [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
