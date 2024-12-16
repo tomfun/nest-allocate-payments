@@ -1,0 +1,74 @@
+### Get fees
+
+GET http://localhost:8080/api/admin/fees
+Content-Type: application/json
+Accept: application/json
+
+### Set fees
+
+PATCH http://localhost:8080/api/admin/fees
+Content-Type: application/json
+Accept: application/json
+
+{
+  "fixedA": "0",
+  "percentB": "0",
+  "percentBlockD": "50"
+}
+
+### Add shop
+
+POST http://localhost:8080/api/admin/shop
+Content-Type: application/json
+Accept: application/json
+
+{
+  "name": "Shop 1",
+  "commissionC": "0"
+}
+
+### Get shop
+
+GET http://localhost:8080/api/admin/shop/1
+Content-Type: application/json
+Accept: application/json
+
+### Create a Payment:
+
+POST http://localhost:8080/api/payment
+Content-Type: application/json
+Accept: application/json
+
+{
+  "shopId": "1",
+  "amount": "1000"
+}
+
+### Process a payment -> processed
+
+PATCH http://localhost:8080/api/payment/status
+Content-Type: application/json
+Accept: application/json
+
+{
+  "paymentIds": ["2"],
+  "newStatus": "processed"
+}
+
+### Process a payment -> unlocked
+
+PATCH http://localhost:8080/api/payment/status
+Content-Type: application/json
+Accept: application/json
+
+{
+  "paymentIds": ["2"],
+  "newStatus": "unlocked"
+}
+
+### Pay out
+
+POST http://localhost:8080/api/admin/shop/1/payout
+Content-Type: application/json
+Accept: application/json
+
